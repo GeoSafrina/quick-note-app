@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quick Notes</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+      min-height: 100vh;
+      color: #1f2937;
+      padding: 24px 16px;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
+    h1 { text-align: center; color: #4f46e5; margin-bottom: 20px; }
+    form, .note {
+      background: #fff;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.1);
+    }
+    form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      font: inherit;
+      outline: none;
+    }
+    input:focus, textarea:focus { border-color: #6366f1; box-shadow: 0 0 0 3px #e0e7ff; }
+    textarea { resize: vertical; min-height: 90px; }
+    button {
+      border: none; cursor: pointer; font: inherit; font-weight: 600;
+      border-radius: 10px; padding: 12px; transition: transform .1s, opacity .2s;
+    }
+    button:active { transform: scale(0.97); }
+    .add-btn { background: #6366f1; color: #fff; }
+    .add-btn:hover { opacity: .9; }
+    .notes { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+    .note h3 { margin-bottom: 6px; word-break: break-word; }
+    .note p { white-space: pre-wrap; word-break: break-word; color: #4b5563; margin-bottom: 10px; }
+    .note small { color: #9ca3af; display: block; margin-bottom: 10px; }
+    .del-btn { background: #fee2e2; color: #b91c1c; padding: 8px 12px; }
+    .del-btn:hover { background: #fecaca; }
+    .empty, .error { text-align: center; color: #6b7280; padding: 20px; }
+    .error { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📝 Quick Notes</h1>
+
+    <form id="note-form">
+      <input id="title" type="text" placeholder="Title" maxlength="100" required />
+      <textarea id="content" placeholder="Write your note..." maxlength="2000" required></textarea>
+      <button type="submit" class="add-btn">Add Note</button>
+    </form>
+
+    <div id="message" class="error" hidden></div>
+    <div id="notes" class="notes"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById("note-form");
+    const titleEl = document.getElementById("title");
+    const contentEl = document.getElementById("content");
+    const notesEl = document.getElementById("notes");
+    const messageEl = document.getElementById("message");
+
+    function showError(text) {
+      messageEl.textContent = text;
+      messageEl.hidden = !text;
+    }
+
+    function render(notes) {
+      notesEl.innerHTML = "";
+      if (notes.length === 0) {
+        notesEl.innerHTML = '<div class="empty">No notes yet. Add your first one above!</div>';
+        return;
+      }
+      notes.forEach((note) => {
+        const card = document.createElement("div");
+        card.className = "note";
+
+        const h3 = document.createElement("h3");
+        h3.textContent = note.title;
+
+        const p = document.createElement("p");
+        p.textContent = note.content;
+
+        const small = document.createElement("small");
+        small.textContent = new Date(note.createdAt).toLocaleString();
+
+        const del = document.createElement("button");
+        del.className = "del-btn";
+        del.textContent = "Delete";
+        del.addEventListener("click", () => deleteNote(note.id));
+
+        card.append(h3, p, small, del);
+        notesEl.appendChild(card);
+      });
+    }
+
+    async function loadNotes() {
+      try {
+        const res = await fetch("/notes");
+        if (!res.ok) throw new Error("Failed to load notes");
+        render(await res.json());
+        showError("");
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    async function addNote(e) {
+      e.preventDefault();
+      try {
+        const res = await fetch("/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: titleEl.value, content: contentEl.value }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not add note");
+        form.reset();
+        loadNotes();
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    async function deleteNote(id) {
+      try {
+        const res = await fetch("/notes/" + id, { method: "DELETE" });
+        if (!res.ok) throw new Error("Could not delete note");
+        loadNotes();
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    form.addEventListener("submit", addNote);
+    loadNotes();
+  </script>
+</body>
+</html>
